@@ -14,6 +14,7 @@
 #include <stdlib.h>    // abort()
 #include <pthread.h>   // pthread_...
 #include <stdbool.h>   // true, false
+#include <string.h>
 
 #include "timing.h"    // timing_start(), timing_stop()
 
@@ -48,9 +49,10 @@ void *
 inc_no_sync(void *arg __attribute__((unused)))
 {
     int i;
-
     for (i = 0; i < INC_ITERATIONS; i++) {
+    // CRITICAL SECTION    
         counter += INCREMENT;
+    // END OF CCRITICAL SECTION
     }
 
     return NULL;
@@ -61,11 +63,11 @@ void *
 dec_no_sync(void *arg __attribute__((unused)))
 {
     int i;
-
     for (i = 0; i < DEC_ITERATIONS; i++) {
+    // CRITICAL SECTION
         counter -= DECREMENT;
+    // END OF CRITICAL SECTION
     }
-
     return NULL;
 }
 
@@ -78,11 +80,20 @@ void *
 inc_mutex(void *arg __attribute__((unused)))
 {
     int i;
-
+    int error;
     for (i = 0; i < INC_ITERATIONS; i++) {
-        /* TODO: Protect access to the shared variable counter with a mutex lock
-         * inside the loop. */
-        counter += INCREMENT;
+        error = pthread_mutex_lock(&mutex);
+        if (error == 0)
+        {
+    // CRITICAL SECTION
+            counter += INCREMENT;   
+    // END OF CRITICAL SECTION
+            pthread_mutex_unlock(&mutex);
+        }
+        else
+        {
+            printf("%s\n", strerror(error));
+        }
     }
 
     return NULL;
@@ -93,12 +104,23 @@ void *
 dec_mutex(void *arg __attribute__((unused)))
 {
     int i;
-
+    int error;
+    
     for (i = 0; i < DEC_ITERATIONS; i++) {
-        /* TODO: Protect access to the shared variable counter with a mutex lock
-         * inside the loop. */
-        counter -= DECREMENT;
+        error = pthread_mutex_lock(&mutex);
+        if (error == 0)
+        {
+    // CRITICAL SECTION
+            counter -= DECREMENT;   
+    // END OF CRITICAL SECTION
+            pthread_mutex_unlock(&mutex);
+        }
+        else
+        {
+            printf("%s\n", strerror(error));
+        }
     }
+    
 
     return NULL;
 }
@@ -109,11 +131,11 @@ dec_mutex(void *arg __attribute__((unused)))
 *******************************************************************************/
 
 void spin_lock() {
-    /* TODO: Implement the lock operation for a test-and-set spinlock. */
+    while (__sync_lock_test_and_set(&lock, true));
 }
 
 void spin_unlock() {
-    /* TODO: Implement the unlock operation for a test-and-set spinlock. */
+    lock = false;
 }
 
 /* Increments of the shared counter should be protected by a test-and-set spinlock */
@@ -123,8 +145,11 @@ inc_tas_spinlock(void *arg __attribute__((unused)))
     int i;
 
     for (i = 0; i < INC_ITERATIONS; i++) {
-        /* TODO: Add the spin_lock() and spin_unlock() operations inside the loop. */
+        spin_lock();
+    // CRITICAL SECTION
         counter += INCREMENT;
+    // END OF CRITICAL SECTION
+        spin_unlock();
     }
 
     return NULL;
@@ -137,8 +162,11 @@ dec_tas_spinlock(void *arg __attribute__((unused)))
     int i;
 
     for (i = 0; i < DEC_ITERATIONS; i++) {
-        /* TODO: Add the spin_lock() and spin_unlock() operations inside the loop. */
+        spin_lock();
+    // CRITICAL SECTION
         counter -= DECREMENT;
+    // END OF CRITICAL SECTION
+        spin_unlock();
     }
 
     return NULL;
@@ -156,9 +184,9 @@ inc_atomic(void *arg __attribute__((unused)))
     int i;
 
     for (i = 0; i < INC_ITERATIONS; i++) {
-        /* TODO: Use atomic addition to increment the shared counter */
-
-        counter += INCREMENT; // You need to replace this.
+    // CRITICAL SECTION
+        __sync_fetch_and_add(&counter, INCREMENT);
+    // END OF CRITICAL SECTION
     }
 
     return NULL;
@@ -171,9 +199,9 @@ dec_atomic(void *arg __attribute__((unused)))
     int i;
 
     for (i = 0; i < DEC_ITERATIONS; i++) {
-        /* TODO: Use atomic subtraction to increment the shared counter */
-
-        counter -= DECREMENT; // You need to replace this.
+    // CRITICAL SECTION
+        __sync_fetch_and_sub(&counter, DECREMENT);
+    // END OF CRITICAL SECTION
     }
 
     return NULL;
