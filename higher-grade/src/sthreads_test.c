@@ -2,6 +2,7 @@
 #include <stdio.h>    // printf(), fprintf(), stdout, stderr, perror(), _IOLBF
 #include <stdbool.h>  // true, false
 #include <limits.h>   // INT_MAX
+#include <unistd.h>   // usleep(), sleep()
 
 #include "sthreads.h" // init(), spawn(), yield(), done()
 
@@ -29,6 +30,7 @@ void letters() {
   char c = 'a';
 
   while (true) {
+      sleep(1);
       printf(" c = %c\n", c);
       if (c == 'f') done();
       yield();
@@ -107,6 +109,7 @@ void magic_numbers() {
   int n = 3;
   int m;
   while (true) {
+    sleep(1);
     m = (n*(n*n+1)/2);
     if (m > 0) {
       printf(" magic(%d) = %d\n", n, m);
@@ -130,4 +133,17 @@ int main(){
   puts("\n==== Test program for the Simple Threads API ====\n");
 
   init(); // Initialization
+
+  spawn(magic_numbers);
+  spawn(letters);
+  for (int i = 0; i < 10; i++)
+  {
+    puts("Back in main!");
+    yield();
+  }
+
+  terminate();
+  
+
+  puts("\n==== Tests Done! ====\n");
 }

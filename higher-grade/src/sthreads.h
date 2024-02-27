@@ -88,4 +88,9 @@ void done();
 */
 tid_t join(tid_t thread);
 
+/*
+Terminates the thread calling this function
+*/
+void terminate();
+
 #endif

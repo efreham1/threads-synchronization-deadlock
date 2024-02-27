@@ -90,6 +90,6 @@ void buffer_get(buffer_t *buffer, tuple_t *tuple) {
 
   buffer->out = (buffer->out + 1) % buffer->size;
   
-  psem_signal(buffer->mutex);
   psem_signal(buffer->empty);
+  psem_signal(buffer->mutex);
 }
