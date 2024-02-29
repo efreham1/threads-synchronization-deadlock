@@ -19,7 +19,7 @@ void numbers() {
   while (true) {
     printf(" n = %d\n", n);
     n = (n + 1) % (INT_MAX);
-    if (n > 3) done();
+    //if (n > 3) done();
     yield();
   }
 }
@@ -28,9 +28,7 @@ void numbers() {
  */
 void letters() {
   char c = 'a';
-
   while (true) {
-      sleep(1);
       printf(" c = %c\n", c);
       if (c == 'f') done();
       yield();
@@ -40,7 +38,7 @@ void letters() {
 
 /* Calculates the nth Fibonacci number using recursion.
  */
-int fib(int n) {
+long fib(long n) {
   switch (n) {
   case 0:
     return 0;
@@ -60,18 +58,34 @@ int fib(int n) {
    from scratch.
 */
 
-void fibonacci_slow() {
-  int n = 0;
-  int f;
-  while (true) {
+void fibonacci_slow_a() {
+  long n = 30;
+  long f;
+  while (n<41) {
     f = fib(n);
     if (f < 0) {
       // Restart on overflow.
       n = 0;
     }
-    printf(" fib(%02d) = %d\n", n, fib(n));
+    printf(" A: slow_fib(%02ld) = %ld\n", n, fib(n));
     n = (n + 1) % INT_MAX;
   }
+  done();
+}
+
+void fibonacci_slow_b() {
+  long n = 30;
+  long f;
+  while (n<44) {
+    f = fib(n);
+    if (f < 0) {
+      // Restart on overflow.
+      n = 0;
+    }
+    printf(" B: slow_fib(%02ld) = %ld\n", n, fib(n));
+    n = (n + 1) % INT_MAX;
+  }
+  done();
 }
 
 /* Print the Fibonacci number sequence over and over again.
@@ -87,7 +101,7 @@ void fibonacci_fast() {
   int next = a + b;
 
   while(true) {
-    printf(" fib(%02d) = %d\n", n, a);
+    printf(" fast_fib(%02d) = %d\n", n, a);
     next = a + b;
     a = b;
     b = next;
@@ -109,10 +123,10 @@ void magic_numbers() {
   int n = 3;
   int m;
   while (true) {
-    sleep(1);
     m = (n*(n*n+1)/2);
     if (m > 0) {
       printf(" magic(%d) = %d\n", n, m);
+      if (n == 8) done();
       n = (n+1) % INT_MAX;
     } else {
       // Start over when m overflows.
@@ -133,17 +147,25 @@ int main(){
   puts("\n==== Test program for the Simple Threads API ====\n");
 
   init(); // Initialization
+  puts("\n==== Testing join ====\n");
+  tid_t thrd = spawn(letters);
+  join(thrd);
+  puts("is c = f?");
 
-  spawn(magic_numbers);
-  spawn(letters);
-  for (int i = 0; i < 10; i++)
-  {
-    puts("Back in main!");
-    yield();
-  }
+  puts("\n==== Testing yield on two threads ====\n");
+  tid_t thrd1 = spawn(magic_numbers);
+  tid_t thrd2 =  spawn(letters);
 
-  terminate();
-  
+  join(thrd1);
+  join(thrd2);
+
+  puts("\n==== Testing timer on two threads ====\n");
+
+  tid_t a = spawn(fibonacci_slow_a);
+  tid_t b = spawn(fibonacci_slow_b);
+
+  printf("\nThread A done with tid %d\n", join(a));
+  printf("\nThread B done with tid %d\n", join(b));
 
   puts("\n==== Tests Done! ====\n");
 }

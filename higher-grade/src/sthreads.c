@@ -18,6 +18,9 @@
 
 #include "sthreads.h"
 
+#include <string.h>   // memset()
+#include <sys/time.h> // ITIMER_REAL, ITIMER_VIRTUAL, ITIMER_PROF, struct itimerval, setitimer()
+
 /* Stack size for each context. */
 #define STACK_SIZE SIGSTKSZ * 100
 
@@ -38,9 +41,30 @@ thread_t *last_thread;
                       Add internal helper functions here.
 ********************************************************************************/
 
+void timer_signal(int signum) {
+  printf("Thread %d preempted \n", running_thread->tid);
+  yield();
+}
+
+void set_timer(int ms){
+   struct itimerval timer;
+  timer.it_value.tv_sec = 0;
+  timer.it_value.tv_usec = ms*1000;
+  timer.it_interval.tv_sec = 0;
+  timer.it_interval.tv_usec = ms*1000;
+  if (setitimer(ITIMER_REAL, &timer, NULL) < 0) {
+    perror("Setting timer");
+    exit(EXIT_FAILURE);
+  };
+}
+
+
+
 /*******************************************************************************
                     Implementation of the Simple Threads API
 ********************************************************************************/
+
+
 
 
 int init() { 
@@ -60,6 +84,12 @@ int init() {
    threads->next = NULL;
    running_thread = threads;
    last_thread = threads;
+   struct sigaction sa;
+
+   memset (&sa, 0, sizeof (sa));
+   sa.sa_handler =  timer_signal;
+   sigaction (SIGALRM, &sa, NULL);
+   set_timer(999);
    return 1; 
    }
 
@@ -86,12 +116,75 @@ tid_t spawn(void (*start)()) {
    running_thread->state = ready;
    running_thread = new_thread;
    
-   swapcontext(&calling_thread->ctx, &new_thread->ctx);
+   if (swapcontext(&calling_thread->ctx, &new_thread->ctx)) exit(EXIT_FAILURE);
    return new_thread->tid; 
 }
 
 void yield() {
+   thread_t *calling_thread = running_thread;
+   calling_thread->state = ready;
+   thread_t *next_thread = calling_thread->next;
+   if (next_thread == NULL) next_thread = threads;
+   while (next_thread->state != ready)
+   {
+      next_thread = next_thread->next;
+      if (next_thread == NULL) next_thread = threads;
+   }
+   
+   running_thread = next_thread;
+   running_thread->state = running;
+   
+   if (swapcontext(&calling_thread->ctx, &next_thread->ctx)) exit(EXIT_FAILURE);
+}
 
+void done() {
+   thread_t *waiting_thread = running_thread->next;
+   if (waiting_thread == NULL) waiting_thread = threads;
+   for (int i = 0; i < next_tid; i++)
+   {
+      waiting_thread = waiting_thread->next;
+      if (waiting_thread == NULL) waiting_thread = threads;
+
+      if (waiting_thread->state == waiting && waiting_thread->waiting_for == running_thread->tid)
+      {
+         waiting_thread->state = ready;
+         waiting_thread->waiting_for = -1;
+      }
+   }
+
+   thread_t *next_thread = running_thread->next;
+   if (next_thread == NULL) next_thread = threads;
+   int threads_checked = 1;
+   while (next_thread->state != ready)
+   {
+      next_thread = next_thread->next;
+      if (next_thread == NULL) next_thread = threads;
+      if (threads_checked == next_tid) exit(EXIT_SUCCESS);
+   }
+   
+   running_thread->state = terminated;
+   running_thread = next_thread;
+   running_thread->state = running;
+   
+   if (setcontext(&next_thread->ctx)) 
+   {
+      exit(EXIT_FAILURE);
+   }
+}
+
+tid_t join(tid_t thread) {   
+   thread_t *terminated_thread = running_thread->next;
+   if (terminated_thread == NULL) terminated_thread = threads;
+   for (int i = 0; i < next_tid; i++)
+   {
+      terminated_thread = terminated_thread->next;
+      if (terminated_thread == NULL) terminated_thread = threads;
+
+      if (terminated_thread->state == terminated && terminated_thread->tid == thread)
+      {
+         return thread;
+      }
+   }
    thread_t *next_thread = running_thread->next;
    if (next_thread == NULL) next_thread = threads;
    while (next_thread->state != ready)
@@ -101,30 +194,14 @@ void yield() {
    }
    
    thread_t *calling_thread = running_thread;
-   calling_thread->state = ready;
+   calling_thread->state = waiting;
+   calling_thread->waiting_for = thread;
    running_thread = next_thread;
    running_thread->state = running;
    
-   swapcontext(&calling_thread->ctx, &next_thread->ctx);
+   if (swapcontext(&calling_thread->ctx, &next_thread->ctx)){
+      exit(EXIT_FAILURE);
+   } 
+   return thread;
 }
 
-void done() {}
-
-tid_t join(tid_t thread) { return -1; }
-
-void terminate()
-{
-   thread_t *next_thread = running_thread->next;
-   if (next_thread == NULL) next_thread = threads;
-   while (next_thread->state != ready)
-   {
-      next_thread = next_thread->next;
-      if (next_thread == NULL) next_thread = threads;
-   }
-   
-   running_thread->state = terminated;
-   running_thread = next_thread;
-   running_thread->state = running;
-   
-   setcontext(&next_thread->ctx);
-}
