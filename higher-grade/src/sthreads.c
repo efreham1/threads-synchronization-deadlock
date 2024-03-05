@@ -89,7 +89,7 @@ int init() {
    memset (&sa, 0, sizeof (sa));
    sa.sa_handler =  timer_signal;
    sigaction (SIGALRM, &sa, NULL);
-   set_timer(999);
+   set_timer(2);
    return 1; 
    }
 
@@ -102,7 +102,7 @@ tid_t spawn(void (*start)()) {
    new_thread->state = running;
    if (getcontext(&new_thread->ctx) == -1)
    {
-      perror("Could not create context for first thread");
+      perror("Could not create context thread");
       return -1;
    }
    new_thread->ctx.uc_stack.ss_sp = new_stack;
@@ -204,4 +204,3 @@ tid_t join(tid_t thread) {
    } 
    return thread;
 }
-
